@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RefreshCw, AlertCircle, Activity, Target, Zap } from 'lucide-react';
 import Card from './ui/Card';
+import { getAllMetrics } from '../utils/typingMetrics';
 
 const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     const [input, setInput] = useState('');
@@ -10,6 +11,7 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     const [accuracy, setAccuracy] = useState(100);
     const [charIndex, setCharIndex] = useState(0);
     const [mistakes, setMistakes] = useState(0);
+    const [previousWPM, setPreviousWPM] = useState(0);
 
     const inputRef = useRef(null);
     const timerRef = useRef(null);
@@ -32,25 +34,24 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     }, []);
 
     const calculateStats = useCallback(() => {
-        if (timeLeft === duration) return;
-
         const timeElapsed = duration - timeLeft;
+
+        // Don't calculate if test hasn't started
         if (timeElapsed === 0) return;
 
-        // Correct WPM calculation: (correct characters / 5) / (time in minutes)
-        // A "word" is defined as 5 characters including spaces
         const correctChars = charIndex - mistakes;
-        const wordsTyped = correctChars / 5;
-        const timeInMinutes = timeElapsed / 60;
-        const currentWpm = Math.round(wordsTyped / timeInMinutes);
+        const metrics = getAllMetrics({
+            correctCharacters: correctChars,
+            totalCharacters: charIndex,
+            mistakes: mistakes,
+            elapsedSeconds: timeElapsed,
+            previousWPM: previousWPM,
+        });
 
-        const currentAccuracy = charIndex > 0
-            ? Math.round((correctChars / charIndex) * 100)
-            : 100;
-
-        setWpm(currentWpm);
-        setAccuracy(currentAccuracy);
-    }, [charIndex, mistakes, timeLeft, duration]);
+        setWpm(metrics.wpm);
+        setAccuracy(metrics.accuracy);
+        setPreviousWPM(metrics.wpm);
+    }, [charIndex, mistakes, timeLeft, duration, previousWPM]);
 
     useEffect(() => {
         calculateStats();
