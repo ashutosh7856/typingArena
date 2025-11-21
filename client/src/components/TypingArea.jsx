@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RefreshCw, AlertCircle, Activity, Target, Zap } from 'lucide-react';
 import Card from './ui/Card';
-import { getAllMetrics } from '../utils/typingMetrics';
+import { validateAndComputeMetrics } from '../utils/typingMetrics';
 
 const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     const [input, setInput] = useState('');
@@ -9,80 +9,102 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     const [isActive, setIsActive] = useState(false);
     const [wpm, setWpm] = useState(0);
     const [accuracy, setAccuracy] = useState(100);
-    const [charIndex, setCharIndex] = useState(0);
     const [mistakes, setMistakes] = useState(0);
-    const [previousWPM, setPreviousWPM] = useState(0);
 
     const inputRef = useRef(null);
     const timerRef = useRef(null);
+    const startTimeRef = useRef(null);
+    const previousSmoothedWpmRef = useRef(0);
 
+    // Timer that runs continuously once started
     useEffect(() => {
         if (isActive && timeLeft > 0) {
             timerRef.current = setInterval(() => {
-                setTimeLeft((prev) => prev - 1);
+                setTimeLeft((prev) => {
+                    if (prev <= 1) {
+                        return 0;
+                    }
+                    return prev - 1;
+                });
             }, 1000);
-        } else if (timeLeft === 0) {
+        }
+
+        if (timeLeft === 0 && isActive) {
             clearInterval(timerRef.current);
             setIsActive(false);
             onComplete({ wpm, accuracy, mistakes });
         }
-        return () => clearInterval(timerRef.current);
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
     }, [isActive, timeLeft, onComplete, wpm, accuracy, mistakes]);
 
     useEffect(() => {
         inputRef.current?.focus();
     }, []);
 
+    // Calculate stats using the new safe metrics
     const calculateStats = useCallback(() => {
-        const timeElapsed = duration - timeLeft;
+        if (!startTimeRef.current) return;
 
-        // Don't calculate if test hasn't started
-        if (timeElapsed === 0) return;
+        const elapsedMs = Date.now() - startTimeRef.current;
 
-        const correctChars = charIndex - mistakes;
-        const metrics = getAllMetrics({
-            correctCharacters: correctChars,
-            totalCharacters: charIndex,
-            mistakes: mistakes,
-            elapsedSeconds: timeElapsed,
-            previousWPM: previousWPM,
+        const result = validateAndComputeMetrics({
+            typed: input,
+            target: words,
+            elapsedMs: elapsedMs,
+            previousSmoothedWpm: previousSmoothedWpmRef.current,
         });
 
-        setWpm(metrics.wpm);
-        setAccuracy(metrics.accuracy);
-        setPreviousWPM(metrics.wpm);
-    }, [charIndex, mistakes, timeLeft, duration, previousWPM]);
+        setWpm(result.metrics.wpm);
+        setAccuracy(result.metrics.accuracy);
+        setMistakes(result.metrics.uncorrectedMistakes);
+        previousSmoothedWpmRef.current = result.metrics.wpm;
+
+        // Log diagnostics if suspicious
+        if (result.diagnostics.suspicious) {
+            console.warn('⚠️ Suspicious WPM detected:', result.diagnostics);
+            console.log('Metrics:', result.metrics);
+        }
+    }, [input, words]);
 
     useEffect(() => {
         calculateStats();
-    }, [charIndex, calculateStats]);
+    }, [input, calculateStats]);
 
     const handleChange = (e) => {
         const { value } = e.target;
 
+        // Start timer on first keystroke
         if (!isActive && timeLeft === duration) {
             setIsActive(true);
+            startTimeRef.current = Date.now(); // Record start time
         }
 
-        const currentVal = value;
-        setInput(currentVal);
+        setInput(value);
 
-        const targetText = words;
-        let newMistakes = mistakes;
-
-        if (currentVal.length > charIndex) {
-            if (currentVal[currentVal.length - 1] !== targetText[currentVal.length - 1]) {
-                newMistakes++;
-                setMistakes(newMistakes);
-            }
-        }
-
-        setCharIndex(currentVal.length);
-
-        if (currentVal.length === targetText.length) {
+        // Check if test is complete
+        if (value.length === words.length && value === words) {
             clearInterval(timerRef.current);
             setIsActive(false);
-            onComplete({ wpm, accuracy, mistakes: newMistakes });
+
+            // Calculate final stats
+            const elapsedMs = Date.now() - startTimeRef.current;
+            const finalResult = validateAndComputeMetrics({
+                typed: value,
+                target: words,
+                elapsedMs: elapsedMs,
+                previousSmoothedWpm: previousSmoothedWpmRef.current,
+            });
+
+            onComplete({
+                wpm: finalResult.metrics.wpm,
+                accuracy: final Result.metrics.accuracy,
+                mistakes: finalResult.metrics.uncorrectedMistakes
+            });
         }
     };
 
