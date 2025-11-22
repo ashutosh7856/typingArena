@@ -102,7 +102,7 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
 
             onComplete({
                 wpm: finalResult.metrics.wpm,
-                accuracy: final Result.metrics.accuracy,
+                accuracy: finalResult.metrics.accuracy,
                 mistakes: finalResult.metrics.uncorrectedMistakes
             });
         }
