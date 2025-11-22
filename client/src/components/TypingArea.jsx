@@ -1,7 +1,8 @@
+```
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RefreshCw, AlertCircle, Activity, Target, Zap } from 'lucide-react';
 import Card from './ui/Card';
-import { validateAndComputeMetrics } from '../utils/typingMetrics';
+import { getAllMetrics, calculateAccuracy } from '../utils/typingMetrics';
 
 const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     const [input, setInput] = useState('');
@@ -10,11 +11,11 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     const [wpm, setWpm] = useState(0);
     const [accuracy, setAccuracy] = useState(100);
     const [mistakes, setMistakes] = useState(0);
-
+    
     const inputRef = useRef(null);
     const timerRef = useRef(null);
     const startTimeRef = useRef(null);
-    const previousSmoothedWpmRef = useRef(0);
+    const previousWPMRef = useRef(0);
 
     // Timer that runs continuously once started
     useEffect(() => {
@@ -28,13 +29,13 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
                 });
             }, 1000);
         }
-
+        
         if (timeLeft === 0 && isActive) {
             clearInterval(timerRef.current);
             setIsActive(false);
             onComplete({ wpm, accuracy, mistakes });
         }
-
+        
         return () => {
             if (timerRef.current) {
                 clearInterval(timerRef.current);
@@ -46,29 +47,36 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
         inputRef.current?.focus();
     }, []);
 
-    // Calculate stats using the new safe metrics
+    // Calculate stats using metrics module
     const calculateStats = useCallback(() => {
-        if (!startTimeRef.current) return;
-
+        if (!startTimeRef.current || !input.length) return;
+        
         const elapsedMs = Date.now() - startTimeRef.current;
-
-        const result = validateAndComputeMetrics({
-            typed: input,
-            target: words,
-            elapsedMs: elapsedMs,
-            previousSmoothedWpm: previousSmoothedWpmRef.current,
+        const elapsedSeconds = elapsedMs / 1000; // Convert ms to seconds
+        
+        // Count correct chars and mistakes by comparing input to target
+        let correctChars = 0;
+        let errorCount = 0;
+        for (let i = 0; i < input.length; i++) {
+            if (input[i] === words[i]) {
+                correctChars++;
+            } else {
+                errorCount++;
+            }
+        }
+        
+        const metrics = getAllMetrics({
+            correctCharacters: correctChars,
+            totalCharacters: input.length,
+            mistakes: errorCount,
+            elapsedSeconds: elapsedSeconds,
+            previousWPM: previousWPMRef.current,
         });
 
-        setWpm(result.metrics.wpm);
-        setAccuracy(result.metrics.accuracy);
-        setMistakes(result.metrics.uncorrectedMistakes);
-        previousSmoothedWpmRef.current = result.metrics.wpm;
-
-        // Log diagnostics if suspicious
-        if (result.diagnostics.suspicious) {
-            console.warn('⚠️ Suspicious WPM detected:', result.diagnostics);
-            console.log('Metrics:', result.metrics);
-        }
+        setWpm(metrics.wpm);
+        setAccuracy(metrics.accuracy);
+        setMistakes(errorCount);
+        previousWPMRef.current = metrics.wpm;
     }, [input, words]);
 
     useEffect(() => {
@@ -86,24 +94,18 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
 
         setInput(value);
 
-        // Check if test is complete
-        if (value.length === words.length && value === words) {
+        // Check if test is complete (typed full text correctly)
+        if (value.length >= words.length) {
             clearInterval(timerRef.current);
             setIsActive(false);
-
-            // Calculate final stats
-            const elapsedMs = Date.now() - startTimeRef.current;
-            const finalResult = validateAndComputeMetrics({
-                typed: value,
-                target: words,
-                elapsedMs: elapsedMs,
-                previousSmoothedWpm: previousSmoothedWpmRef.current,
-            });
-
+            
+            // Calculate final WPM
+            calculateStats();
+            
             onComplete({
-                wpm: finalResult.metrics.wpm,
-                accuracy: finalResult.metrics.accuracy,
-                mistakes: finalResult.metrics.uncorrectedMistakes
+                wpm,
+                accuracy,
+                mistakes
             });
         }
     };
@@ -190,11 +192,11 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
                         window.location.reload();
                     }}
                     className={`
-            group p-4 rounded-full bg-surface border border-white/10 
-            hover:border-primary/50 hover:bg-white/5 hover:shadow-[0_0_20px_rgba(217,70,239,0.2)]
-            transition-all duration-300 
-            ${isMultiplayer ? 'hidden' : ''}
-          `}
+            group p - 4 rounded - full bg - surface border border - white / 10
+hover: border - primary / 50 hover: bg - white / 5 hover: shadow - [0_0_20px_rgba(217, 70, 239, 0.2)]
+transition - all duration - 300 
+            ${ isMultiplayer ? 'hidden' : '' }
+`}
                 >
                     <RefreshCw className="w-6 h-6 text-gray-400 group-hover:text-primary group-hover:rotate-180 transition-all duration-500" />
                 </button>
