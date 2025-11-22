@@ -1,4 +1,3 @@
-```
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RefreshCw, AlertCircle, Activity, Target, Zap } from 'lucide-react';
 import Card from './ui/Card';
@@ -11,7 +10,7 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     const [wpm, setWpm] = useState(0);
     const [accuracy, setAccuracy] = useState(100);
     const [mistakes, setMistakes] = useState(0);
-    
+
     const inputRef = useRef(null);
     const timerRef = useRef(null);
     const startTimeRef = useRef(null);
@@ -29,13 +28,13 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
                 });
             }, 1000);
         }
-        
+
         if (timeLeft === 0 && isActive) {
             clearInterval(timerRef.current);
             setIsActive(false);
             onComplete({ wpm, accuracy, mistakes });
         }
-        
+
         return () => {
             if (timerRef.current) {
                 clearInterval(timerRef.current);
@@ -50,10 +49,10 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
     // Calculate stats using metrics module
     const calculateStats = useCallback(() => {
         if (!startTimeRef.current || !input.length) return;
-        
+
         const elapsedMs = Date.now() - startTimeRef.current;
         const elapsedSeconds = elapsedMs / 1000; // Convert ms to seconds
-        
+
         // Count correct chars and mistakes by comparing input to target
         let correctChars = 0;
         let errorCount = 0;
@@ -64,7 +63,7 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
                 errorCount++;
             }
         }
-        
+
         const metrics = getAllMetrics({
             correctCharacters: correctChars,
             totalCharacters: input.length,
@@ -98,10 +97,10 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
         if (value.length >= words.length) {
             clearInterval(timerRef.current);
             setIsActive(false);
-            
+
             // Calculate final WPM
             calculateStats();
-            
+
             onComplete({
                 wpm,
                 accuracy,
@@ -192,10 +191,10 @@ const TypingArea = ({ words, duration, onComplete, isMultiplayer = false }) => {
                         window.location.reload();
                     }}
                     className={`
-            group p - 4 rounded - full bg - surface border border - white / 10
+                        group p - 4 rounded - full bg - surface border border - white / 10
 hover: border - primary / 50 hover: bg - white / 5 hover: shadow - [0_0_20px_rgba(217, 70, 239, 0.2)]
 transition - all duration - 300 
-            ${ isMultiplayer ? 'hidden' : '' }
+                        ${isMultiplayer ? 'hidden' : ''}
 `}
                 >
                     <RefreshCw className="w-6 h-6 text-gray-400 group-hover:text-primary group-hover:rotate-180 transition-all duration-500" />
